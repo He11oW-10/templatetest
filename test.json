@@ -1,0 +1,108 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "appServicePlanResourceId": {
+            "type": "string",
+            "metadata": {
+                "description": "Resource ID of the App Service Plan the App Service will run under"
+            }
+        },
+        "appServiceName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name to assign to the App Service"
+            }
+        },
+        "isAzureFunction": {
+            "type": "bool",
+            "defaultValue": false,
+            "metadata": {
+                "description": "Whether the App Service being deployed is an Azure Function"
+            }
+        },
+        "siteConfig": {
+            "type": "secureObject",
+            "metadata": {
+                "description": "Site configurations to apply to the App Service"
+            }
+        },
+        "appKind": {
+            "type": "string",
+            "allowedValues": [
+                "app",
+                "linux"
+            ],
+            "metadata": {
+                "description": "App kind, representing the operating system the App Service will be running under. A value of 'app' will mean that the App Service is running under Windows, and a value of 'linux' will mean that the App Service is running under Linux."
+            }
+        },
+        "appServiceApplicationSettings": {
+            "type": "secureObject",
+            "defaultValue": {},
+            "metadata": {
+                "description": "Collection of Application Settings in JSON format (key/value pairs passed in as a secureObject) that are to be applied to the App Service. Optional parameter."
+            }
+        },
+        "utcDateTimeStamp": {
+            "type": "string",
+            "metadata": {
+                "description": "UTC timestamp in yyyyMMddHHmmss format to be applied to the names of deployments triggered by this deployment"
+            },
+            "defaultValue": "[utcNow('yyyyMMddHHmmss')]"
+        },
+        "location": {
+            "type": "string",
+            "metadata": {
+                "description": "Azure region in which resources are to be provisioned in"
+            },
+            "defaultValue": "[resourceGroup().location]"
+        },
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2020-12-01",
+            "name": "[parameters('appServiceName')]",
+            "location": "[parameters('location')]",
+            "kind": "[concat(if(parameters('isAzureFunction'), 'functionapp,', ''), parameters('appKind'))]",
+            "properties": {
+                "serverFarmId": "[parameters('appServicePlanResourceId')]",
+                "siteConfig": "[parameters('siteConfig')]"
+            },
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "resources": [
+                {
+                    "type": "config",
+                    "apiVersion": "2020-12-01",
+                    "name": "appSettings",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/sites', parameters('appServiceName'))]"
+                    ],
+                    "condition": "[and(not(equals(null(), parameters('appServiceApplicationSettings'))), not(empty(parameters('appServiceApplicationSettings'))))]",
+                    "properties": "[json(parameters('appServiceApplicationSettings'))]"
+                }
+            ]
+        },
+    ],
+    "outputs": {
+        "appServiceCustomDomainVerificationId": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.Web/sites', parameters('appServiceName')), '2021-01-01').customDomainVerificationId]"
+        },
+        "appServiceDefaultHostName": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.Web/sites', parameters('appServiceName')), '2021-01-01').defaultHostName]"
+        },
+        "appServiceResourceId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.Web/sites', parameters('appServiceName'))]"
+        },
+        "appServiceUrl": {
+            "type": "string",
+            "value": "[concat('https://', parameters('appServiceName'), '.azurewebsites.net')]"
+        }
+    }
+}
