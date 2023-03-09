@@ -82,7 +82,7 @@
                         "[resourceId('Microsoft.Web/sites', parameters('appServiceName'))]"
                     ],
                     "condition": "[and(not(equals(null(), parameters('appServiceApplicationSettings'))), not(empty(parameters('appServiceApplicationSettings'))))]",
-                    "properties": "[json(parameters('appServiceApplicationSettings'))]"
+                    "properties": "[parameters('appServiceApplicationSettings')]"
                 }
             ]
         },
