@@ -1,0 +1,316 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "header": {
+            "defaultValue": "202306test",
+            "type": "String"
+        },
+        "runtime": {
+            "defaultValue": "dotnet",
+            "type": "String"
+        },
+        "storageAccountType": {
+            "defaultValue": "Standard_LRS",
+            "type": "String"
+        }
+    },
+    "variables": {
+        "vnetName": "[concat(parameters('header'), '-A1-vnet1')]",
+        "vnetAddressPrefix": "10.201.0.0/16",
+        "subnetName1": "default",
+        "subnetAddressPrefix1": "10.201.0.0/24",
+        "subnetName2": "ase",
+        "subnetAddressPrefix2": "10.201.1.0/24",
+        "asename": "[concat(parameters('header'), '-A1-ASE')]",
+        "appServicePlanName": "[concat(parameters('header'),'-A1-ASP')]",
+        "functionAppName": "[concat(parameters('header'),'-A1-APP')]",
+        "functionWorkerRuntime": "[parameters('runtime')]",
+        "storageAccountName": "[format('{0}azfunctions', uniqueString(resourceGroup().id))]",
+        "NetworkSecurityGroup": "[concat(parameters('header'), '-A1-NSG')]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2020-08-01",
+            "name": "[variables('vnetName')]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[variables('vnetAddressPrefix')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('subnetName1')]",
+                        "properties": {
+                            "addressPrefix": "[variables('subnetAddressPrefix1')]"
+                        }
+                    },
+                    {
+                        "name": "[variables('subnetName2')]",
+                        "properties": {
+                            "addressPrefix": "[variables('subnetAddressPrefix2')]",
+                            "delegations": [
+                                {
+                                    "name": "delegation",
+                                    "properties": {
+                                        "serviceName": "Microsoft.Web/hostingEnvironments"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Web/hostingEnvironments",
+            "apiVersion": "2018-02-01",
+            "name": "[variables('aseName')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+            ],
+            "kind": "ASEV2",
+            "properties": {
+                "name": "[variables('aseName')]",
+                "location": "[resourceGroup().location]",
+                "ipSslAddressCount": 0,
+                "internalLoadBalancingMode": 3,
+                "virtualNetwork": {
+                    "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), variables('subnetName2'))]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2018-02-01",
+            "name": "[variables('appServicePlanName')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/hostingEnvironments', variables('aseName'))]"
+            ],
+            "sku": {
+                "name": "I1",
+                "size": "I1",
+                "tier": "Isolated",
+                "capacity": 1
+            },
+            "kind": "app",
+            "properties": {
+                "hostingEnvironmentProfile": {
+                    "id": "[resourceId('Microsoft.Web/hostingEnvironments', variables('aseName'))]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2022-05-01",
+            "name": "[variables('storageAccountName')]",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "[parameters('storageAccountType')]"
+            },
+            "kind": "Storage"
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2018-11-01",
+            "name": "[variables('functionAppName')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/hostingEnvironments', variables('aseName'))]",
+                "[resourceId('Microsoft.Web/serverFarms', variables('appServicePlanName'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+            ],
+            "kind": "functionapp",
+            "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverFarms', variables('appServicePlanName'))]",
+                "siteConfig": {
+                    "appSettings": [
+                        {
+                            "name": "AzureWebJobsStorage",
+                            "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};EndpointSuffix={1};AccountKey={2}', variables('storageAccountName'), environment().suffixes.storage, listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName')), '2022-05-01').keys[0].value)]"
+                        },
+                        {
+                            "name": "FUNCTIONS_EXTENSION_VERSION",
+                            "value": "~4"
+                        },
+                        {
+                            "name": "FUNCTIONS_WORKER_RUNTIME",
+                            "value": "[variables('functionWorkerRuntime')]"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-05-01",
+            "name": "[variables('NetworkSecurityGroup')]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "Inbound-Management",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "454",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 100,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "Inbound-Management2",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "455",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 101,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "Inbound-loadbalancer",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "16001",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 150,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "Inbound-HTTPS",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "443",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 130,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "Outbound-443",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "443",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 100,
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "Outbound-123",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "123",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 110,
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "Outbound-DB1",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "1433",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 120,
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "Outbound-DB2",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "11000-11999",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 130,
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "Outbound-DB3",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "14000-14999",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 140,
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "Outbound-12000",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "12000",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 180,
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "Outbound-DNS",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "53",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 150,
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "Outbound-80",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "80",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 160,
+                            "direction": "Outbound"
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}
