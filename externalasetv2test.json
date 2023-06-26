@@ -3,7 +3,7 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "header": {
-            "defaultValue": "202306test",
+            "defaultValue": "202306test3",
             "type": "String"
         },
         "runtime": {
@@ -27,7 +27,7 @@
         "functionAppName": "[concat(parameters('header'),'-A1-APP')]",
         "functionWorkerRuntime": "[parameters('runtime')]",
         "storageAccountName": "[format('{0}azfunctions', uniqueString(resourceGroup().id))]",
-        "NetworkSecurityGroup": "[concat(parameters('header'), '-A1-NSG')]"
+        "networkSecurityGroupName": "[concat(parameters('header'), '-A1-NSG')]"
     },
     "resources": [
         {
@@ -35,6 +35,9 @@
             "apiVersion": "2020-08-01",
             "name": "[variables('vnetName')]",
             "location": "[resourceGroup().location]",
+			"dependsOn": [
+				"[resourceId('Microsoft.Network/networkSecurityGroups/', variables('networkSecurityGroupName'))]"
+            ],
             "properties": {
                 "addressSpace": {
                     "addressPrefixes": [
@@ -52,6 +55,9 @@
                         "name": "[variables('subnetName2')]",
                         "properties": {
                             "addressPrefix": "[variables('subnetAddressPrefix2')]",
+							"networkSecurityGroup": {
+								"id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+							},
                             "delegations": [
                                 {
                                     "name": "delegation",
