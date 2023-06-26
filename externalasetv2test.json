@@ -75,10 +75,6 @@
             ],
             "kind": "ASEV2",
             "properties": {
-                "name": "[variables('aseName')]",
-                "location": "[resourceGroup().location]",
-                "ipSslAddressCount": 0,
-                "internalLoadBalancingMode": 3,
                 "virtualNetwork": {
                     "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), variables('subnetName2'))]"
                 }
