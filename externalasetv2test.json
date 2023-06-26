@@ -3,7 +3,7 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "header": {
-            "defaultValue": "202306test3",
+            "defaultValue": "202306test",
             "type": "String"
         },
         "runtime": {
@@ -55,9 +55,9 @@
                         "name": "[variables('subnetName2')]",
                         "properties": {
                             "addressPrefix": "[variables('subnetAddressPrefix2')]",
-							"networkSecurityGroup": {
-								"id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
-							},
+			    "networkSecurityGroup": {
+			            "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+			    },
                             "delegations": [
                                 {
                                     "name": "delegation",
@@ -151,7 +151,7 @@
         {
             "type": "Microsoft.Network/networkSecurityGroups",
             "apiVersion": "2020-05-01",
-            "name": "[variables('NetworkSecurityGroup')]",
+            "name": "[variables('networkSecurityGroupName')]",
             "location": "[resourceGroup().location]",
             "properties": {
                 "securityRules": [
